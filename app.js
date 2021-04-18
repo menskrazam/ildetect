@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { Telegraf } = require('telegraf');
+const { v4: uuidv4 } = require('uuid');
 
 const urlValidate = require('./tasks');
 
@@ -20,8 +21,9 @@ if (!process.env.SERVER_URL) {
 // Set up settings
 const token = process.env.TOKEN;
 const port = process.env.PORT;
-const endpoint = 'slsaiej3j';
-const webHookUrl = `${process.env.SERVER_URL}/${endpoint}`;
+const serverUrl = process.env.SERVER_URL ? process.env.SERVER_URL.replace(/\/$/, '') : '';
+const endpoint = uuidv4();
+const webHookUrl = `${serverUrl}/${endpoint}`;
 
 // Create bot
 const bot = new Telegraf(token);
