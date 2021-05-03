@@ -1,11 +1,12 @@
 {
   "apps": [{
-  "name": "ildetect",
-  "script": "./app.js",
-  "cwd": ".",
-  "watch": false,
-  "env": {
-    "NODE_ENV": "production"
-  }
-}]
+    "name": "ildetect",
+    "script": "npm",
+    "args" : "start",
+    "cwd": ".",
+    "watch": false,
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }]
 }
