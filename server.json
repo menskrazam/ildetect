@@ -1,6 +1,6 @@
 {
   "apps": [{
-  "name": "ildetect",
+  "name": "ildetectys",
   "script": "npm",
   "cwd": ".",
   "watch": false,
