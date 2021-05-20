@@ -3,7 +3,7 @@ const express = require('express');
 const { Telegraf } = require('telegraf');
 const { v4: uuidv4 } = require('uuid');
 
-const urlValidate = require('./tasks');
+const { urlValidate } = require('./tasks');
 
 // Init app
 if (!process.env.TOKEN) {
