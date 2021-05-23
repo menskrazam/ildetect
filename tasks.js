@@ -3,6 +3,7 @@ const got = require('got');
 const eggs = require('./easterEggsDomains.json');
 const iploggerServers = require('./iploggerDomains.json');
 const lookup = require('safe-browse-url-lookup');
+const userAgents = require('./userAgents.json')
 
 // Init google safe browser
 const googleLookup = lookup({ apiKey: process.env.GOOGLE_API_KEY });
@@ -11,10 +12,14 @@ const googleLookup = lookup({ apiKey: process.env.GOOGLE_API_KEY });
 const iploggerServersPattern = `(${iploggerServers.map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`;
 
 // Parse text message to URL object
-const parseTextToUrl = (ctx) => {
+const parseUrlFromCtx = (ctx) => {
   const { message } = ctx.update || { message: { text: '' } };
   const { text } = message;
-  const normalizedText = !text ? '' : text.trim().toLowerCase();
+  return parseUrlFromText(text);
+}
+
+const parseUrlFromText = (text) => {
+  const normalizedText = !text ? '' : text.trim();
   if (!text) {
     return false;
   }
@@ -57,31 +62,27 @@ const googleSafeBrowsingValidate = async (ctx, next, url) => {
 const iploggerValidate = async (ctx, next, url) => {
   ctx.reply('Глянем iplogger для начала. Губошлепы любят его использовать.');
 
-  if (iploggerServers.filter((domain) => url.hostname.endsWith(domain)).length > 0) {
+  if (isIpLoggerUrl(url)) {
     return ctx.reply('Да, это оно! Палёночка! Свежая! Губошлепами запахло! Не открывайте эту ссылку! Она сопрет IP адрес.');
   }
 
   let hasILLinks = false;
-  let hasRedirect = false;
+  let hasIlRedirect = false;
   let hasError = false;
   let hasErrorCode = false;
   let response = false;
   ctx.reply('Снаружи вроде как всё прилично... Посмотрим что там внутри, есть ли iplogger. Может занять немножко времени.');
 
   try {
-    response = await got(url.toString(), {
-      timeout: 10000,
-      hooks: {
-        beforeRedirect: [
-          () => {
-            hasRedirect = true;
-          }
-        ]
-      }
-    });
+    response = await fetchPage(url.toString());
   } catch (error) {
     hasError = true;
     hasErrorCode = error.response && error.response.statusCode ? error.response.statusCode : false;
+    hasIlRedirect = error.message === 'ipLoggerRedirect';
+  }
+
+  if (hasIlRedirect) {
+    return ctx.reply('Да, это оно! Палёночка! Свежая! Губошлепами запахло! Не открывайте эту ссылку! Она сопрет IP адрес.');
   }
 
   if (hasError && hasErrorCode && hasErrorCode === 404) {
@@ -105,20 +106,58 @@ const iploggerValidate = async (ctx, next, url) => {
   }
 
   // If all ok
-  if (hasRedirect) {
-    ctx.reply('Какой то странный редирект у этой ссылочки. Но в остальном от iplogger вроде бы безопасна. Но кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
-  } else {
-    ctx.reply('Эта ссылка вроде как не iplogger. От этой гадости она безопасна. Но всё равно, кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
-  }
+  ctx.reply('Эта ссылка вроде как не iplogger. От этой гадости она безопасна. Но всё равно, кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
 
   return googleSafeBrowsingValidate(ctx, next, url);
 }
 
-module.exports = async (ctx, next) => {
-  const url = parseTextToUrl(ctx);
+const isIpLoggerUrl = (url) => {
+  if (!url) return false;
+
+  return !!(iploggerServers.find((domain) => url.hostname.endsWith(domain)));
+};
+
+const fetchPage = async (url) => {
+  const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+
+  const client = got.extend(
+    {
+      headers: {
+        'User-Agent': userAgent,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8'
+      }
+    }
+  );
+
+  return client(url, {
+    timeout: 10000,
+    hooks: {
+      beforeRedirect: [
+        (options, response) => {
+          const urlText = response.headers.location;
+          if (!urlText) return;
+          const url = parseUrlFromText(urlText);
+
+          if (isIpLoggerUrl(url)) {
+            throw new Error('ipLoggerRedirect');
+          }
+        }
+      ]
+    }
+  });
+}
+
+const urlValidate = async (ctx, next) => {
+  const url = parseUrlFromCtx(ctx);
   if (!url) {
     return ctx.reply('А это вы правда ссылку ща ввели? Я чет разобрать не смог.');
   }
   ctx.reply('Итак, посмотрим, что тут за ссылочка...');
   return easterEggsValidate(ctx, next, url);
+}
+
+module.exports = {
+  urlValidate
 };
