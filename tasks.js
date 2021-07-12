@@ -63,6 +63,8 @@ const iploggerValidate = async (ctx, next, url) => {
 
   let hasILLinks = false;
   let hasRedirect = false;
+  let hasSameOriginRedirect = false;
+  let redirectUrl = '';
   let hasError = false;
   let hasErrorCode = false;
   let response = false;
@@ -72,15 +74,16 @@ const iploggerValidate = async (ctx, next, url) => {
     response = await got(url.toString(), {
       timeout: 10000,
       hooks: {
-        beforeRedirect: [
-          () => {
-            hasRedirect = true;
-          }
-        ]
+        beforeRedirect: [(options) => {
+          hasRedirect = true;
+          hasSameOriginRedirect = url.hostname && options.url && options.url.origin ? options.url.origin.toLowerCase().endsWith(url.hostname.toLowerCase()) : false;
+          redirectUrl = options.url && options.url.href ? options.url.href : '';
+        }]
       }
     });
   } catch (error) {
     hasError = true;
+    console.log('error', error);
     hasErrorCode = error.response && error.response.statusCode ? error.response.statusCode : false;
   }
 
@@ -89,7 +92,7 @@ const iploggerValidate = async (ctx, next, url) => {
   }
 
   if (hasError && hasErrorCode) {
-    return ctx.reply('Мммм... Сервер то я нашел, но он по этой ссылке ничего толком не отдает и бормочет что то невразумительное. Обманывает небось, но я не могу проверить эту ссылку в результате.');
+    return ctx.reply('Мммм... Сервер то я нашел, но он по этой ссылке ничего толком не отдает, пытается в ответ выговорить код ' + hasErrorCode + ' и бормочет что то невразумительное. Обманывает небось, но я не могу проверить эту ссылку в результате.');
   }
 
   if (hasError) {
@@ -104,9 +107,14 @@ const iploggerValidate = async (ctx, next, url) => {
     return ctx.reply('Да, это оно! Палёночка! Свежая! Губошлепами запахло! Не открывайте эту ссылку! Она сопрет IP адрес.');
   }
 
-  // If all ok
+  // If all ok we check redirect
   if (hasRedirect) {
-    ctx.reply('Какой то странный редирект у этой ссылочки. Но в остальном от iplogger вроде бы безопасна. Но кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
+    // We check same-origin for this redirect
+    if (hasSameOriginRedirect) {
+      ctx.reply('От iplogger ссылка вроде бы безопасна. Нашелся только редирект, но ведет он на тот же сервак, врядли он проблемный. Ведет на ссылку ' + redirectUrl + '. Но кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
+    } else {
+      ctx.reply('Какой то странный редирект у этой ссылочки. Лучше по ней не лазить. Ведет на ссылку ' + redirectUrl + '. От iplogger вроде бы безопасно, но этот странный редирект - кто знает что за ним ждет? И что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
+    }
   } else {
     ctx.reply('Эта ссылка вроде как не iplogger. От этой гадости она безопасна. Но всё равно, кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
   }
