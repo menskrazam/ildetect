@@ -11,6 +11,8 @@
         "ecmaVersion": 2018
     },
     "rules": {
-        "semi": 0
+        "semi": 0,
+        "quotes": "off",
+        "no-fallthrough": "off"
     }
 }
