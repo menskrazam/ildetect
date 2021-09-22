@@ -7,7 +7,6 @@ const WebHookProvider = require("./webhooks/WebhookProvider");
 const { urlValidate } = require('./tasks');
 
 async function main () {
-// Init app
   if (!process.env.TOKEN) {
     throw new Error('TOKEN must be provided!');
   }
@@ -19,13 +18,11 @@ async function main () {
   const bot = new Telegraf(token);
   const webhook = await WebHookProvider.init(bot, process.env.NODE_ENV);
 
-  const webhookUrl = webhook.url;
-  const endpoint = webhook.endpoint;
-  const port = webhook.port;
+  const { url, endpoint, port } = webhook;
 
   await bot.launch({
     webhook: {
-      domain: webhookUrl,
+      domain: url,
       hookPath: `/${endpoint}`
     }
   });
@@ -52,7 +49,7 @@ async function main () {
 
   // Start server
   app.listen(port, () => {
-    console.log(`Bot app listening on port ${port}! Endpoint registered on ${webhookUrl}/${endpoint}`);
+    console.log(`Bot app listening on port ${port}! Endpoint registered on ${url}/${endpoint}`);
   });
 }
 
