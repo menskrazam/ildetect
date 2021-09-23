@@ -4,10 +4,15 @@ const express = require('express');
 const { Telegraf } = require('telegraf');
 const WebHookProvider = require("./webhooks/WebhookProvider");
 const CommandRouter = require("./commands/Router");
+const Logger = require("./Logger");
 
 const { urlValidateFromContext } = require('./tasks');
 
+const logger = new Logger(process.env.DEBUG !== undefined);
+
 async function main () {
+  logger.info("Starting ILDetect");
+
   if (!process.env.TOKEN) {
     throw new Error('TOKEN must be provided!');
   }
@@ -52,7 +57,7 @@ async function main () {
 
   // Start server
   app.listen(port, () => {
-    console.log(`Bot app listening on port ${port}! Endpoint registered on ${url}/${endpoint}`);
+    logger.info(`ILDetect listening on port ${port}. Endpoint registered on ${url}/${endpoint}`);
   });
 }
 

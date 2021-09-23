@@ -34,12 +34,13 @@ const easterEggsValidate = async (ctx, next, url) => {
 
 // Google Safe Browsing APIs (v4) validator
 const googleSafeBrowsingValidate = async (ctx, next, url) => {
-  await ctx.reply('А что гугл думает про эту ссылку? У него инфы про гадости много, ща тож спросим.');
-
   let checkOnGoogle = false;
+
   try {
     checkOnGoogle = await googleLookup.checkSingle(url.toString());
   } catch (error) {
+    console.error("googleSafeBrowsingValidate error");
+
     await ctx.reply('Попытался спросить у Гугла, что его безопасность о ссылке думает - молчит собака... Ошибка связи какая то. Ябатьки канал что ли перегрызли?');
     return next();
   }
