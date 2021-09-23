@@ -11,13 +11,6 @@ const googleLookup = lookup({ apiKey: process.env.GOOGLE_API_KEY });
 // Generate pattern string for iplogger domains validation
 const iploggerServersPattern = `(${iploggerServers.map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`;
 
-// Parse text message to URL object
-const parseUrlFromCtx = (ctx) => {
-  const { message } = ctx.update || { message: { text: '' } };
-  const { text } = message;
-  return parseUrlFromText(text);
-}
-
 const parseUrlFromText = (text) => {
   const normalizedText = !text ? '' : text.trim();
   if (!text) {
@@ -40,13 +33,13 @@ const easterEggsValidate = async (ctx, next, url) => {
 
 // Google Safe Browsing APIs (v4) validator
 const googleSafeBrowsingValidate = async (ctx, next, url) => {
-  ctx.reply('А что гугл думает про эту ссылку? У него инфы про гадости много, ща тож спросим.');
+  await ctx.reply('А что гугл думает про эту ссылку? У него инфы про гадости много, ща тож спросим.');
 
   let checkOnGoogle = false;
   try {
     checkOnGoogle = await googleLookup.checkSingle(url.toString());
   } catch (error) {
-    ctx.reply('Попытался спросить у Гугла, что его безопасность о ссылке думает - молчит собака... Ошибка связи какая то. Ябатьки канал что ли перегрызли?');
+    await ctx.reply('Попытался спросить у Гугла, что его безопасность о ссылке думает - молчит собака... Ошибка связи какая то. Ябатьки канал что ли перегрызли?');
     return next();
   }
 
@@ -54,13 +47,13 @@ const googleSafeBrowsingValidate = async (ctx, next, url) => {
     return ctx.reply('Гугл говорит, что это дрянь какая то, которую открывать НЕЛЬЗЯ!');
   }
 
-  ctx.reply('Гугл говорит, что всё ок. Но если честно - это от обычных угроз ок. От кражи адреса всё равно никто не застрахован, мало ли какие еще способы они выдумают. Лучше вообще ничего из телеги не открывать на самом деле. Вот добавим еще и антивирусные проверки, вот заживем... Но все равно! Надо помнить - лучший способ защититься - не переходить по ссылкам!');
+  await ctx.reply('Гугл говорит, что всё ок. Но если честно - это от обычных угроз ок. От кражи адреса всё равно никто не застрахован, мало ли какие еще способы они выдумают. Лучше вообще ничего из телеги не открывать на самом деле. Вот добавим еще и антивирусные проверки, вот заживем... Но все равно! Надо помнить - лучший способ защититься - не переходить по ссылкам!');
   return next();
 }
 
 // IPLogger validator
 const iploggerValidate = async (ctx, next, url) => {
-  ctx.reply('Глянем iplogger для начала. Губошлепы любят его использовать.');
+  await ctx.reply('Глянем iplogger для начала. Губошлепы любят его использовать.');
 
   if (isIpLoggerUrl(url)) {
     return ctx.reply('Да, это оно! Палёночка! Свежая! Губошлепами запахло! Не открывайте эту ссылку! Она сопрет IP адрес.');
@@ -71,7 +64,7 @@ const iploggerValidate = async (ctx, next, url) => {
   let hasError = false;
   let hasErrorCode = false;
   let response = false;
-  ctx.reply('Снаружи вроде как всё прилично... Посмотрим что там внутри, есть ли iplogger. Может занять немножко времени.');
+  await ctx.reply('Снаружи вроде как всё прилично... Посмотрим что там внутри, есть ли iplogger. Может занять немножко времени.');
 
   try {
     response = await fetchPage(url.toString());
@@ -106,7 +99,7 @@ const iploggerValidate = async (ctx, next, url) => {
   }
 
   // If all ok
-  ctx.reply('Эта ссылка вроде как не iplogger. От этой гадости она безопасна. Но всё равно, кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
+  await ctx.reply('Эта ссылка вроде как не iplogger. От этой гадости она безопасна. Но всё равно, кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
 
   return googleSafeBrowsingValidate(ctx, next, url);
 }
@@ -149,23 +142,33 @@ const fetchPage = async (url) => {
   });
 }
 
-const urlValidate = async (ctx, next) => {
+const urlValidateFromContext = async (ctx, next) => {
   const { message } = ctx.update || { message: { text: '' } };
   const { text } = message;
 
+  // skip processing if this looks like a bot command
   if (text.startsWith("/")) {
     return next();
   }
 
-  const url = parseUrlFromCtx(ctx);
+  return urlValidateFromMessage(ctx, message.text, next);
+}
 
+const urlValidateFromMessage = async (ctx, messageText, next) => {
+  const url = parseUrlFromText(messageText);
+  return urlValidateFromUrl(ctx, url, next);
+}
+
+const urlValidateFromUrl = async (ctx, url, next) => {
   if (!url) {
     return ctx.reply('А это вы правда ссылку ща ввели? Я чет разобрать не смог.');
   }
-  ctx.reply('Итак, посмотрим, что тут за ссылочка...');
+
+  await ctx.reply('Итак, посмотрим, что тут за ссылочка...');
   return easterEggsValidate(ctx, next, url);
 }
 
 module.exports = {
-  urlValidate
+  urlValidateFromContext,
+  urlValidateFromMessage
 };

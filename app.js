@@ -5,7 +5,7 @@ const { Telegraf } = require('telegraf');
 const WebHookProvider = require("./webhooks/WebhookProvider");
 const CommandRouter = require("./commands/Router");
 
-const { urlValidate } = require('./tasks');
+const { urlValidateFromContext } = require('./tasks');
 
 async function main () {
   if (!process.env.TOKEN) {
@@ -42,7 +42,7 @@ async function main () {
   CommandRouter.init(bot);
 
   // Check link
-  bot.on('text', async (ctx, next) => urlValidate(ctx, next));
+  bot.on('text', async (ctx, next) => urlValidateFromContext(ctx, next));
 
   // Create express server
   const app = express();
