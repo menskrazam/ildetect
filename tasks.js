@@ -1,9 +1,10 @@
 require('dotenv').config();
 const got = require('got');
-const eggs = require('./easterEggsDomains.json');
-const iploggerServers = require('./iploggerDomains.json');
 const lookup = require('safe-browse-url-lookup');
-const userAgents = require('./userAgents.json')
+
+const eggs = require('./resources/easterEggsDomains.json');
+const iploggerServers = require('./resources/iploggerDomains.json');
+const userAgents = require('./resources/userAgents.json')
 
 // Init google safe browser
 const googleLookup = lookup({ apiKey: process.env.GOOGLE_API_KEY });
