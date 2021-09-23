@@ -6,11 +6,26 @@ const eggs = require('./resources/easterEggsDomains.json');
 const iploggerServers = require('./resources/iploggerDomains.json');
 const userAgents = require('./resources/userAgents.json')
 
+const MSG_IPLOGGER_DETECTED = "‼️По ссылке обнаружен IPLogger. Ни в коем случае не открывайте её, это деанонимизирует вас!";
+const MSG_404 = "❗️Невозможно найти страницу по ссылке. Проверка не выполнена.";
+const MSG_500 = "❗️Страница по ссылке возвращает ошибку. Проверка не выполнена."
+const MSG_LGTM = "✅ IPLogger не обнаружен, но это не является гарантией вашей безопасности. Открывайте на свой страх и риск.";
+const MSG_NOT_AN_URL = "ℹ️Это не ссылка.";
+
+const MSG_GOOGLE_SBC_FAIL = "‼️Google Safe Browsing сообщает, что данная страница небезопасна для посещения. Ни в коем случае " +
+  "не открывайте её, это может деанонимизировать вас или заразить ваше устройство вирусом!";
+
 // Init google safe browser
 const googleLookup = lookup({ apiKey: process.env.GOOGLE_API_KEY });
 
 // Generate pattern string for iplogger domains validation
 const iploggerServersPattern = `(${iploggerServers.map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`;
+
+let logger;
+
+const init = (log) => {
+  logger = log;
+}
 
 const parseUrlFromText = (text) => {
   const normalizedText = !text ? '' : text.trim();
@@ -36,29 +51,28 @@ const easterEggsValidate = async (ctx, next, url) => {
 const googleSafeBrowsingValidate = async (ctx, next, url) => {
   let checkOnGoogle = false;
 
+  logger.debug(`googleSafeBrowsingValidate check on ${url}`);
+
   try {
     checkOnGoogle = await googleLookup.checkSingle(url.toString());
-  } catch (error) {
-    console.error("googleSafeBrowsingValidate error");
-
-    await ctx.reply('Попытался спросить у Гугла, что его безопасность о ссылке думает - молчит собака... Ошибка связи какая то. Ябатьки канал что ли перегрызли?');
+  } catch (e) {
+    logger.error(`googleSafeBrowsingValidate error on ${url}`, e);
     return next();
   }
 
   if (checkOnGoogle) {
-    return ctx.reply('Гугл говорит, что это дрянь какая то, которую открывать НЕЛЬЗЯ!');
+    return ctx.reply(MSG_GOOGLE_SBC_FAIL);
   }
 
-  await ctx.reply('Гугл говорит, что всё ок. Но если честно - это от обычных угроз ок. От кражи адреса всё равно никто не застрахован, мало ли какие еще способы они выдумают. Лучше вообще ничего из телеги не открывать на самом деле. Вот добавим еще и антивирусные проверки, вот заживем... Но все равно! Надо помнить - лучший способ защититься - не переходить по ссылкам!');
   return next();
 }
 
 // IPLogger validator
 const iploggerValidate = async (ctx, next, url) => {
-  await ctx.reply('Глянем iplogger для начала. Губошлепы любят его использовать.');
+  logger.debug(`IPLogger surface check on ${url}`);
 
   if (isIpLoggerUrl(url)) {
-    return ctx.reply('Да, это оно! Палёночка! Свежая! Губошлепами запахло! Не открывайте эту ссылку! Она сопрет IP адрес.');
+    return ctx.reply(MSG_IPLOGGER_DETECTED);
   }
 
   let hasILLinks = false;
@@ -66,10 +80,9 @@ const iploggerValidate = async (ctx, next, url) => {
   let hasError = false;
   let hasErrorCode = false;
   let response = false;
-  await ctx.reply('Снаружи вроде как всё прилично... Посмотрим что там внутри, есть ли iplogger. Может занять немножко времени.');
 
   try {
-    response = await fetchPage(url.toString());
+    response = await checkIPLoggerRedirect(url.toString());
   } catch (error) {
     hasError = true;
     hasErrorCode = error.response && error.response.statusCode ? error.response.statusCode : false;
@@ -77,19 +90,19 @@ const iploggerValidate = async (ctx, next, url) => {
   }
 
   if (hasIlRedirect) {
-    return ctx.reply('Да, это оно! Палёночка! Свежая! Губошлепами запахло! Не открывайте эту ссылку! Она сопрет IP адрес.');
+    return ctx.reply(MSG_IPLOGGER_DETECTED);
   }
 
   if (hasError && hasErrorCode && hasErrorCode === 404) {
-    return ctx.reply('Ммм... Сервер то я нашел, но он мамой клянется, что такой страницы у него нет. Обманывает небось, но я не могу проверить эту ссылку в результате.');
+    return ctx.reply(MSG_404);
   }
 
   if (hasError && hasErrorCode) {
-    return ctx.reply('Мммм... Сервер то я нашел, но он по этой ссылке ничего толком не отдает и бормочет что то невразумительное. Обманывает небось, но я не могу проверить эту ссылку в результате.');
+    return ctx.reply(MSG_500);
   }
 
   if (hasError) {
-    return ctx.reply('Мммм... Слууушай, что то я такой ссылки вообще не нахожу, ничего для анализа загрузить не получилось :( Она вообще существует? Я туда ору - а оттуда никто не отвечает. :(');
+    return ctx.reply(MSG_500);
   }
 
   try {
@@ -97,11 +110,11 @@ const iploggerValidate = async (ctx, next, url) => {
   } catch (error) {}
 
   if (hasILLinks) {
-    return ctx.reply('Да, это оно! Палёночка! Свежая! Губошлепами запахло! Не открывайте эту ссылку! Она сопрет IP адрес.');
+    return ctx.reply(MSG_IPLOGGER_DETECTED);
   }
 
   // If all ok
-  await ctx.reply('Эта ссылка вроде как не iplogger. От этой гадости она безопасна. Но всё равно, кто знает, что еще они придумают, лучше не переходить ни по каким ссылкам и пользоваться VPN и постоянно проверять список подключенных в телегу устройств.');
+  await ctx.reply(MSG_LGTM);
 
   return googleSafeBrowsingValidate(ctx, next, url);
 }
@@ -112,7 +125,9 @@ const isIpLoggerUrl = (url) => {
   return !!(iploggerServers.find((domain) => url.hostname.endsWith(domain)));
 };
 
-const fetchPage = async (url) => {
+const checkIPLoggerRedirect = async (url) => {
+  logger.debug(`IPLogger redirect check on ${url}`);
+
   const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
 
   const client = got.extend(
@@ -163,14 +178,14 @@ const urlValidateFromMessage = async (ctx, messageText, next) => {
 
 const urlValidateFromUrl = async (ctx, url, next) => {
   if (!url) {
-    return ctx.reply('А это вы правда ссылку ща ввели? Я чет разобрать не смог.');
+    return ctx.reply(MSG_NOT_AN_URL);
   }
 
-  await ctx.reply('Итак, посмотрим, что тут за ссылочка...');
   return easterEggsValidate(ctx, next, url);
 }
 
 module.exports = {
   urlValidateFromContext,
-  urlValidateFromMessage
+  urlValidateFromMessage,
+  init
 };

@@ -6,7 +6,7 @@ const WebHookProvider = require("./webhooks/WebhookProvider");
 const CommandRouter = require("./commands/Router");
 const Logger = require("./Logger");
 
-const { urlValidateFromContext } = require('./tasks');
+const Validator = require('./Validator');
 
 const logger = new Logger(process.env.DEBUG !== undefined);
 
@@ -19,6 +19,7 @@ async function main () {
 
   // Set up settings
   const token = process.env.TOKEN;
+  Validator.init(logger);
 
   // Create bot
   const bot = new Telegraf(token);
@@ -44,10 +45,10 @@ async function main () {
       'Одно сообщение - один адрес.');
   });
 
-  CommandRouter.init(bot);
+  CommandRouter.init(logger, bot);
 
   // Check link
-  bot.on('text', async (ctx, next) => urlValidateFromContext(ctx, next));
+  bot.on('text', async (ctx, next) => Validator.urlValidateFromContext(ctx, next));
 
   // Create express server
   const app = express();
