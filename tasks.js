@@ -150,7 +150,15 @@ const fetchPage = async (url) => {
 }
 
 const urlValidate = async (ctx, next) => {
+  const { message } = ctx.update || { message: { text: '' } };
+  const { text } = message;
+
+  if (text.startsWith("/")) {
+    return next();
+  }
+
   const url = parseUrlFromCtx(ctx);
+
   if (!url) {
     return ctx.reply('А это вы правда ссылку ща ввели? Я чет разобрать не смог.');
   }

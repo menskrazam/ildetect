@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const { Telegraf } = require('telegraf');
 const WebHookProvider = require("./webhooks/WebhookProvider");
+const CommandRouter = require("./commands/Router");
 
 const { urlValidate } = require('./tasks');
 
@@ -37,6 +38,8 @@ async function main () {
       'время будет, еще допишем проверок и на другие случаи жизни. Короче ближе к делу. Вводите адреса на проверку. ' +
       'Одно сообщение - один адрес.');
   });
+
+  CommandRouter.init(bot);
 
   // Check link
   bot.on('text', async (ctx, next) => urlValidate(ctx, next));
