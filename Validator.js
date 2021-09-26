@@ -10,7 +10,7 @@ const MSG_IPLOGGER_DETECTED = "‼️По ссылке обнаружен IPLogg
 const MSG_404 = "❗️Невозможно найти страницу по ссылке. Проверка не выполнена.";
 const MSG_500 = "❗️Страница по ссылке возвращает ошибку. Проверка не выполнена."
 const MSG_LGTM = "✅ IPLogger не обнаружен, но это не является гарантией вашей безопасности. Открывайте на свой страх и риск.";
-const MSG_NOT_AN_URL = "ℹ️Это не ссылка.";
+const MSG_NOT_AN_URL = "ℹ️ Это не ссылка.";
 
 const MSG_GOOGLE_SBC_FAIL = "‼️Google Safe Browsing сообщает, что данная страница небезопасна для посещения. Ни в коем случае " +
   "не открывайте её, это может деанонимизировать вас или заразить ваше устройство вирусом!";
@@ -178,6 +178,13 @@ const urlValidateFromMessage = async (ctx, messageText, next) => {
 
 const urlValidateFromUrl = async (ctx, url, next) => {
   if (!url) {
+    // detect whether this is a private chat with a bot, or a message received in a chat
+    if (ctx.update && ctx.update.message.chat.id < 0) {
+      // the message originates from a chat. silently return
+
+      return next();
+    }
+
     return ctx.reply(MSG_NOT_AN_URL);
   }
 
