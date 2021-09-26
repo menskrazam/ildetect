@@ -15,6 +15,8 @@ const MSG_NOT_AN_URL = "ℹ️ Это не ссылка.";
 const MSG_GOOGLE_SBC_FAIL = "‼️Google Safe Browsing сообщает, что данная страница небезопасна для посещения. Ни в коем случае " +
   "не открывайте её, это может деанонимизировать вас или заразить ваше устройство вирусом!";
 
+const URL_EXTRACT_REGEX = /(https?:\/\/[^\s]+)/g;
+
 // Init google safe browser
 const googleLookup = lookup({ apiKey: process.env.GOOGLE_API_KEY });
 
@@ -40,15 +42,21 @@ const parseUrlFromText = (text) => {
 }
 
 // Easter effs validator
-const easterEggsValidate = async (ctx, next, url) => {
+const easterEggsValidate = async (ctx, url, next) => {
   if (eggs.filter((domain) => url.hostname.endsWith(domain)).length > 0) {
-    return ctx.reply('А вот грязь в меня попрошу не кидать! Я к этим доменам не прикоснусь!');
+    if (!isFromChat(ctx)) {
+      await ctx.reply('А вот грязь в меня попрошу не кидать! Я к этим доменам не прикоснусь!');
+      return;
+    }
   }
+
   return iploggerValidate(ctx, next, url);
 }
 
 // Google Safe Browsing APIs (v4) validator
 const googleSafeBrowsingValidate = async (ctx, next, url) => {
+  const replyOps = { reply_to_message_id: ctx.message.message_id };
+
   let checkOnGoogle = false;
 
   logger.debug(`googleSafeBrowsingValidate check on ${url}`);
@@ -61,7 +69,7 @@ const googleSafeBrowsingValidate = async (ctx, next, url) => {
   }
 
   if (checkOnGoogle) {
-    return ctx.reply(MSG_GOOGLE_SBC_FAIL);
+    return ctx.reply(MSG_GOOGLE_SBC_FAIL, replyOps);
   }
 
   return next();
@@ -71,8 +79,10 @@ const googleSafeBrowsingValidate = async (ctx, next, url) => {
 const iploggerValidate = async (ctx, next, url) => {
   logger.debug(`IPLogger surface check on ${url}`);
 
+  const replyOps = { reply_to_message_id: ctx.message.message_id };
+
   if (isIpLoggerUrl(url)) {
-    return ctx.reply(MSG_IPLOGGER_DETECTED);
+    return ctx.reply(MSG_IPLOGGER_DETECTED, replyOps);
   }
 
   let hasILLinks = false;
@@ -90,19 +100,19 @@ const iploggerValidate = async (ctx, next, url) => {
   }
 
   if (hasIlRedirect) {
-    return ctx.reply(MSG_IPLOGGER_DETECTED);
+    return ctx.reply(MSG_IPLOGGER_DETECTED, replyOps);
   }
 
   if (hasError && hasErrorCode && hasErrorCode === 404) {
-    return ctx.reply(MSG_404);
+    return ctx.reply(MSG_404, replyOps);
   }
 
   if (hasError && hasErrorCode) {
-    return ctx.reply(MSG_500);
+    return ctx.reply(MSG_500, replyOps);
   }
 
   if (hasError) {
-    return ctx.reply(MSG_500);
+    return ctx.reply(MSG_500, replyOps);
   }
 
   try {
@@ -110,11 +120,13 @@ const iploggerValidate = async (ctx, next, url) => {
   } catch (error) {}
 
   if (hasILLinks) {
-    return ctx.reply(MSG_IPLOGGER_DETECTED);
+    return ctx.reply(MSG_IPLOGGER_DETECTED, replyOps);
   }
 
   // If all ok
-  await ctx.reply(MSG_LGTM);
+  if (!isFromChat(ctx)) {
+    await ctx.reply(MSG_LGTM, replyOps);
+  }
 
   return googleSafeBrowsingValidate(ctx, next, url);
 }
@@ -172,14 +184,27 @@ const urlValidateFromContext = async (ctx, next) => {
 }
 
 const urlValidateFromMessage = async (ctx, messageText, next) => {
-  const url = parseUrlFromText(messageText);
-  return urlValidateFromUrl(ctx, url, next);
+//  const url = parseUrlFromText(messageText);
+//  return urlValidateFromUrl(ctx, url, next);
+
+  const urls = messageText.match(URL_EXTRACT_REGEX) || [];
+
+  for (const url of urls) {
+    const urlRef = new URL(url);
+    await urlValidateFromUrl(ctx, urlRef, async () => {});
+  }
+
+  next();
+}
+
+const isFromChat = ctx => {
+  return ctx.update && ctx.update.message.chat.id < 0;
 }
 
 const urlValidateFromUrl = async (ctx, url, next) => {
   if (!url) {
     // detect whether this is a private chat with a bot, or a message received in a chat
-    if (ctx.update && ctx.update.message.chat.id < 0) {
+    if (isFromChat(ctx)) {
       // the message originates from a chat. silently return
 
       return next();
@@ -188,7 +213,7 @@ const urlValidateFromUrl = async (ctx, url, next) => {
     return ctx.reply(MSG_NOT_AN_URL);
   }
 
-  return easterEggsValidate(ctx, next, url);
+  return easterEggsValidate(ctx, url, next);
 }
 
 module.exports = {
