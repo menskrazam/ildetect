@@ -4,7 +4,8 @@ const lookup = require('safe-browse-url-lookup');
 
 const eggs = require('./resources/easterEggsDomains.json');
 const iploggerServers = require('./resources/iploggerDomains.json');
-const userAgents = require('./resources/userAgents.json')
+const userAgents = require('./resources/userAgents.json');
+const domainWhitelist = require("./resources/whitelistedDomains.json");
 
 const MSG_IPLOGGER_DETECTED = "‼️По ссылке обнаружен IPLogger. Ни в коем случае не открывайте её, это деанонимизирует вас!";
 const MSG_404 = "❗️Невозможно найти страницу по ссылке. Проверка не выполнена.";
@@ -39,6 +40,10 @@ const parseUrlFromText = (text) => {
     q = new URL(normalizedText);
   } catch (e) {}
   return q;
+}
+
+const isWhitelistedDomain = (url) => {
+  return (domainWhitelist.filter((domain) => url.hostname.endsWith(domain)).length > 0);
 }
 
 // Easter effs validator
@@ -202,6 +207,8 @@ const isFromChat = ctx => {
 }
 
 const urlValidateFromUrl = async (ctx, url, next) => {
+  const replyOps = { reply_to_message_id: ctx.message.message_id };
+
   if (!url) {
     // detect whether this is a private chat with a bot, or a message received in a chat
     if (isFromChat(ctx)) {
@@ -211,6 +218,14 @@ const urlValidateFromUrl = async (ctx, url, next) => {
     }
 
     return ctx.reply(MSG_NOT_AN_URL);
+  }
+
+  if (isWhitelistedDomain(url)) {
+    if (!isFromChat(ctx)) {
+      await ctx.reply(MSG_LGTM, replyOps);
+    }
+
+    return next();
   }
 
   return easterEggsValidate(ctx, url, next);
