@@ -9,11 +9,15 @@
     "dotenv": "^8.2.0",
     "express": "~4.16.1",
     "got": "^11.8.2",
+    "moment": "^2.29.1",
+    "ngrok": "^4.2.2",
     "safe-browse-url-lookup": "^0.1.1",
     "telegraf": "^4.3.0",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
+    "@babel/core": "^7.15.5",
+    "@babel/eslint-parser": "^7.15.7",
     "eslint": "^7.24.0",
     "eslint-config-standard": "^16.0.2",
     "eslint-plugin-import": "^2.22.1",
